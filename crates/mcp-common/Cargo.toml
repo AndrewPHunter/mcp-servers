@@ -1,0 +1,21 @@
+[package]
+name = "mcp-common"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+redis = { workspace = true }
+lancedb = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+arrow-array = { workspace = true }
+arrow-schema = { workspace = true }
+fastembed = "4"
+# Note: fastembed 4.x uses ort 2.0.0-rc which is compatible with our toolchain.
+# Upgrading to fastembed 5.x can be done as a separate change if needed.
