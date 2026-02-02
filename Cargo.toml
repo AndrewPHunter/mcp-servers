@@ -5,6 +5,7 @@ members = [
     "crates/cpp-guidelines",
     "crates/rust-api-guidelines",
     "crates/llm-proxy",
+    "crates/nodejs-guidelines",
 ]
 
 [workspace.dependencies]

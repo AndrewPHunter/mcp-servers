@@ -11,9 +11,11 @@ crates/
   cpp-guidelines/   C++ Core Guidelines MCP server
   rust-api-guidelines/ Rust API Guidelines MCP server
   llm-proxy/        Local OpenAI-compatible proxy MCP server
+  nodejs-guidelines/ Node.js Best Practices MCP server
 data/                Local data directory (not committed)
   cpp-guidelines/    Cloned C++ Core Guidelines repository
   rust-api-guidelines/ Cloned rust-lang/api-guidelines repository
+  nodejs-guidelines/  Cloned nodebestpractices repository
   lancedb/           LanceDB vector database files
   redis/             Redis persistence (AOF/RDB)
 ```
@@ -44,6 +46,7 @@ docker compose up -d
 ```sh
 git clone https://github.com/isocpp/CppCoreGuidelines.git data/cpp-guidelines
 git clone https://github.com/rust-lang/api-guidelines.git data/rust-api-guidelines
+git clone https://github.com/goldbergyoni/nodebestpractices.git data/nodejs-guidelines
 ```
 
 If a target directory already exists and is not empty, remove it first or update it in place:
@@ -74,6 +77,7 @@ cargo build
 - `cargo run -p cpp-guidelines` -- run the C++ Guidelines MCP server
 - `cargo run -p rust-api-guidelines` -- run the Rust API Guidelines MCP server
 - `cargo run -p llm-proxy` -- run the local LLM proxy MCP server
+- `cargo run -p nodejs-guidelines` -- run the Node.js Best Practices MCP server
 - `docker compose up -d` -- start Redis
 - `docker compose down` -- stop Redis
 
@@ -123,6 +127,23 @@ and delegate requests to them via an OpenAI-compatible API host.
 - `get_usage_stats`
   - Input: none
   - Output: JSON object `{ redis_available: bool, models: [{ model, requests, total_tokens?, token_counted_requests, token_unknown_requests }] }`
+
+## Node.js Best Practices MCP Tools
+
+The `nodejs-guidelines` server exposes the following MCP tools.
+
+- `search_guidelines`
+  - Input: `{ "query": string, "limit"?: number }` (`limit` defaults to 10, max 50)
+  - Output: JSON object `{ results: [{ id, title, category, score, summary }] }`
+- `get_guideline`
+  - Input: `{ "guideline_id": string }` (for example `1.1`)
+  - Output: JSON object `{ id, anchor, title, category, source_file, raw_markdown }`
+- `list_category`
+  - Input: `{ "category": string }` (for example `1`, `2`, `3`)
+  - Output: JSON object `{ category: { key, display_name, guideline_count }, guidelines: [{ id, title }] }`
+- `update_guidelines`
+  - Input: none
+  - Output: JSON object `{ updated, commit, guideline_count }`
 
 ## License
 
