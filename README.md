@@ -10,6 +10,7 @@ crates/
   mcp-common/       Shared library (Redis, LanceDB, serialization utilities)
   cpp-guidelines/   C++ Core Guidelines MCP server
   rust-api-guidelines/ Rust API Guidelines MCP server
+  llm-proxy/        Local OpenAI-compatible proxy MCP server
 data/                Local data directory (not committed)
   cpp-guidelines/    Cloned C++ Core Guidelines repository
   rust-api-guidelines/ Cloned rust-lang/api-guidelines repository
@@ -72,6 +73,7 @@ cargo build
 - `cargo test` -- run all tests
 - `cargo run -p cpp-guidelines` -- run the C++ Guidelines MCP server
 - `cargo run -p rust-api-guidelines` -- run the Rust API Guidelines MCP server
+- `cargo run -p llm-proxy` -- run the local LLM proxy MCP server
 - `docker compose up -d` -- start Redis
 - `docker compose down` -- stop Redis
 
@@ -91,6 +93,36 @@ The `rust-api-guidelines` server exposes the following MCP tools.
 - `update_guidelines`
   - Input: none
   - Output: JSON object `{ updated, commit, guideline_count }`
+
+## LLM Proxy MCP Tools
+
+The `llm-proxy` server exposes tools for a coordinator model to discover available local models
+and delegate requests to them via an OpenAI-compatible API host.
+
+- `list_models`
+  - Input: none
+  - Output: JSON object `{ object?, data: [{ id, object?, created?, owned_by? }] }`
+- `ask_model`
+  - Input: `{ "model": string, "prompt": string }`
+  - Output: JSON object `{ text: string }`
+- `chat_model`
+  - Input: `{ "model": string, "messages": [{ "role": string, "content": string }] }`
+  - Output: JSON object `{ text: string }`
+- `generate_code`
+  - Input: `{ "model": string, "language": string, "specification": string }`
+  - Output: JSON object `{ text: string }` (typically code-only)
+- `start_conversation`
+  - Input: none
+  - Output: JSON object `{ conversation_id: string }`
+- `continue_conversation`
+  - Input: `{ "conversation_id": string, "model": string, "prompt": string }`
+  - Output: JSON object `{ text: string }`
+- `end_conversation`
+  - Input: `{ "conversation_id": string }`
+  - Output: JSON object `{ ok: bool }`
+- `get_usage_stats`
+  - Input: none
+  - Output: JSON object `{ redis_available: bool, models: [{ model, requests, total_tokens?, token_counted_requests, token_unknown_requests }] }`
 
 ## License
 

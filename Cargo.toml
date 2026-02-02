@@ -4,6 +4,7 @@ members = [
     "crates/mcp-common",
     "crates/cpp-guidelines",
     "crates/rust-api-guidelines",
+    "crates/llm-proxy",
 ]
 
 [workspace.dependencies]

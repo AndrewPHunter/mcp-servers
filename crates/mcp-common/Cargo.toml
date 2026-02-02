@@ -12,10 +12,12 @@ redis = { workspace = true }
 lancedb = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
 tracing = { workspace = true }
 futures = { workspace = true }
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 fastembed = "4"
 schemars = "1.2"
 # Note: fastembed 4.x uses ort 2.0.0-rc which is compatible with our toolchain.

@@ -6,6 +6,7 @@
 use redis::AsyncCommands;
 use tracing::warn;
 
+#[derive(Clone)]
 pub struct RedisCache {
     client: Option<redis::Client>,
 }
@@ -153,5 +154,41 @@ impl RedisCache {
             }
         }
         true
+    }
+
+    /// Increment a field in a Redis hash by a signed integer. Returns the new value.
+    pub async fn hincr_by(&self, key: &str, field: &str, by: i64) -> Option<i64> {
+        let client = self.client.as_ref()?;
+        let mut conn = client
+            .get_multiplexed_async_connection()
+            .await
+            .inspect_err(|e| warn!(error = %e, "redis connection failed"))
+            .ok()?;
+        let result: i64 = redis::cmd("HINCRBY")
+            .arg(key)
+            .arg(field)
+            .arg(by)
+            .query_async(&mut conn)
+            .await
+            .inspect_err(|e| warn!(error = %e, key, field, "redis HINCRBY failed"))
+            .ok()?;
+        Some(result)
+    }
+
+    /// Get all fields/values from a Redis hash. Returns `None` on Redis errors or if unavailable.
+    pub async fn hgetall(&self, key: &str) -> Option<Vec<(String, String)>> {
+        let client = self.client.as_ref()?;
+        let mut conn = client
+            .get_multiplexed_async_connection()
+            .await
+            .inspect_err(|e| warn!(error = %e, "redis connection failed"))
+            .ok()?;
+        let result: Vec<(String, String)> = redis::cmd("HGETALL")
+            .arg(key)
+            .query_async(&mut conn)
+            .await
+            .inspect_err(|e| warn!(error = %e, key, "redis HGETALL failed"))
+            .ok()?;
+        Some(result)
     }
 }
