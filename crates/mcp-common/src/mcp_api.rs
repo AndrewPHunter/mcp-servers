@@ -21,7 +21,7 @@ pub struct ListCategoryParams {
     pub category: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GuidelineSearchResult {
     pub id: String,
     pub title: String,
@@ -30,13 +30,18 @@ pub struct GuidelineSearchResult {
     pub summary: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SearchGuidelinesResponse {
+    pub results: Vec<GuidelineSearchResult>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GuidelineSection {
     pub heading: String,
     pub content: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GuidelineDetailResponse {
     pub id: String,
     pub anchor: String,
@@ -49,26 +54,26 @@ pub struct GuidelineDetailResponse {
     pub source_file: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CategoryInfo {
     pub key: String,
     pub display_name: String,
     pub guideline_count: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GuidelineSummary {
     pub id: String,
     pub title: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CategoryListResponse {
     pub category: CategoryInfo,
     pub guidelines: Vec<GuidelineSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct UpdateGuidelinesResponse {
     pub updated: bool,
     pub commit: String,

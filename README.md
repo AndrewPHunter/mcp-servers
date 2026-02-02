@@ -81,7 +81,7 @@ The `rust-api-guidelines` server exposes the following MCP tools.
 
 - `search_guidelines`
   - Input: `{ "query": string, "limit"?: number }` (`limit` defaults to 10, max 50)
-  - Output: JSON array of `{ id, title, category, score, summary }`
+  - Output: JSON object `{ results: [{ id, title, category, score, summary }] }`
 - `get_guideline`
   - Input: `{ "guideline_id": string }` (for example `C-CASE`)
   - Output: JSON object `{ id, anchor, title, category, source_file, raw_markdown }`

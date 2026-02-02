@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use rmcp::{
-    ErrorData as McpError, ServerHandler,
+    Json, ServerHandler,
     handler::server::router::tool::ToolRouter,
     handler::server::wrapper::Parameters,
     model::*,
@@ -20,7 +20,7 @@ use mcp_common::embedding::Embedder;
 use mcp_common::mcp_api::{
     CategoryInfo, CategoryListResponse, GetGuidelineParams, GuidelineDetailResponse,
     GuidelineSearchResult, GuidelineSummary, ListCategoryParams, SearchGuidelinesParams,
-    UpdateGuidelinesResponse,
+    SearchGuidelinesResponse, UpdateGuidelinesResponse,
 };
 use mcp_common::vectordb::VectorDb;
 
@@ -86,10 +86,10 @@ impl RustApiGuidelinesServer {
     async fn search_guidelines(
         &self,
         Parameters(params): Parameters<SearchGuidelinesParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<Json<SearchGuidelinesResponse>, String> {
         let query = params.query.trim().to_string();
         if query.is_empty() {
-            return Err(McpError::invalid_params("query must not be empty", None));
+            return Err("query must not be empty".to_string());
         }
 
         let limit = params.limit.unwrap_or(10).min(50) as usize;
@@ -98,7 +98,7 @@ impl RustApiGuidelinesServer {
             .search_engine
             .search(&query, limit)
             .await
-            .map_err(|e| McpError::internal_error(format!("search failed: {e}"), None))?;
+            .map_err(|e| format!("search failed: {e}"))?;
 
         let normalized: Vec<GuidelineSearchResult> = results
             .into_iter()
@@ -111,26 +111,23 @@ impl RustApiGuidelinesServer {
             })
             .collect();
 
-        let json = serde_json::to_string_pretty(&normalized)
-            .map_err(|e| McpError::internal_error(format!("serialization failed: {e}"), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(Json(SearchGuidelinesResponse {
+            results: normalized,
+        }))
     }
 
     #[tool(description = "Get a Rust API guideline by ID (e.g. 'C-CASE', 'C-DEBUG').")]
     async fn get_guideline(
         &self,
         Parameters(params): Parameters<GetGuidelineParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<Json<GuidelineDetailResponse>, String> {
         let guideline_id = params.guideline_id.trim().to_string();
         if guideline_id.is_empty() {
-            return Err(McpError::invalid_params("guideline_id must not be empty", None));
+            return Err("guideline_id must not be empty".to_string());
         }
 
         if let Some(cached) = self.cache.get_guideline(&guideline_id).await {
-            let json = serde_json::to_string_pretty(&to_api_guideline(&cached))
-                .map_err(|e| McpError::internal_error(format!("serialization failed: {e}"), None))?;
-            return Ok(CallToolResult::success(vec![Content::text(json)]));
+            return Ok(Json(to_api_guideline(&cached)));
         }
 
         let state = self.state.read().await;
@@ -139,22 +136,19 @@ impl RustApiGuidelinesServer {
             .iter()
             .find(|(id, _)| id.eq_ignore_ascii_case(&guideline_id))
             .map(|(_, g)| g)
-            .ok_or_else(|| McpError::invalid_params(format!("guideline not found: {guideline_id}"), None))?;
+            .ok_or_else(|| format!("guideline not found: {guideline_id}"))?;
 
-        let json = serde_json::to_string_pretty(&to_api_guideline(guideline))
-            .map_err(|e| McpError::internal_error(format!("serialization failed: {e}"), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(Json(to_api_guideline(guideline)))
     }
 
     #[tool(description = "List all Rust API guidelines in a category (e.g. 'Naming', 'Documentation').")]
     async fn list_category(
         &self,
         Parameters(params): Parameters<ListCategoryParams>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<Json<CategoryListResponse>, String> {
         let category_key = params.category.trim().to_string();
         if category_key.is_empty() {
-            return Err(McpError::invalid_params("category must not be empty", None));
+            return Err("category must not be empty".to_string());
         }
 
         let state = self.state.read().await;
@@ -166,12 +160,9 @@ impl RustApiGuidelinesServer {
             .ok_or_else(|| {
                 let mut available: Vec<&str> = state.categories.keys().map(|s| s.as_str()).collect();
                 available.sort_unstable();
-                McpError::invalid_params(
-                    format!(
-                        "unknown category: '{category_key}'. Available categories: {}",
-                        available.join(", ")
-                    ),
-                    None,
+                format!(
+                    "unknown category: '{category_key}'. Available categories: {}",
+                    available.join(", ")
                 )
             })?;
 
@@ -195,21 +186,18 @@ impl RustApiGuidelinesServer {
             guidelines: guideline_summaries,
         };
 
-        let json = serde_json::to_string_pretty(&response)
-            .map_err(|e| McpError::internal_error(format!("serialization failed: {e}"), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(Json(response))
     }
 
     #[tool(description = "Trigger a re-index of Rust API guidelines from the git repository.")]
-    async fn update_guidelines(&self) -> Result<CallToolResult, McpError> {
+    async fn update_guidelines(&self) -> Result<Json<UpdateGuidelinesResponse>, String> {
         info!("update_guidelines tool invoked");
 
         let (result, new_data) = self
             .update_service
             .update()
             .await
-            .map_err(|e| McpError::internal_error(format!("update failed: {e}"), None))?;
+            .map_err(|e| format!("update failed: {e}"))?;
 
         if let Some((guidelines, categories)) = new_data {
             let guideline_count = guidelines.len();
@@ -235,10 +223,7 @@ impl RustApiGuidelinesServer {
             },
         };
 
-        let json = serde_json::to_string_pretty(&response)
-            .map_err(|e| McpError::internal_error(format!("serialization failed: {e}"), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(json)]))
+        Ok(Json(response))
     }
 }
 
@@ -258,7 +243,7 @@ fn to_api_guideline(guideline: &Guideline) -> GuidelineDetailResponse {
 impl ServerHandler for RustApiGuidelinesServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
+            protocol_version: ProtocolVersion::V_2025_06_18,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
                 name: "rust-api-guidelines".to_string(),
@@ -274,6 +259,31 @@ impl ServerHandler for RustApiGuidelinesServer {
                  browsing, and update_guidelines to refresh from the repository."
                     .to_string(),
             ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RustApiGuidelinesServer;
+
+    #[test]
+    fn tools_publish_output_schemas() {
+        let tools = RustApiGuidelinesServer::tool_router().list_all();
+        for name in [
+            "search_guidelines",
+            "get_guideline",
+            "list_category",
+            "update_guidelines",
+        ] {
+            let tool = tools
+                .iter()
+                .find(|t| t.name == name)
+                .unwrap_or_else(|| panic!("missing tool: {name}"));
+            assert!(
+                tool.output_schema.is_some(),
+                "tool {name} should publish output_schema"
+            );
         }
     }
 }
