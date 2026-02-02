@@ -1,10 +1,3 @@
-/// MCP server implementation for C++ Core Guidelines.
-///
-/// Exposes four tools:
-/// - `search_guidelines`: Semantic search over guidelines
-/// - `get_guideline`: Look up a specific guideline by rule ID
-/// - `list_category`: List all guidelines in a category
-/// - `update_guidelines`: Trigger a re-index from the git repository
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -26,30 +19,26 @@ use crate::update::UpdateService;
 use mcp_common::embedding::Embedder;
 use mcp_common::mcp_api::{
     CategoryInfo, CategoryListResponse, GetGuidelineParams, GuidelineDetailResponse,
-    GuidelineSearchResult, GuidelineSection as ApiGuidelineSection, GuidelineSummary,
-    ListCategoryParams, SearchGuidelinesParams, UpdateGuidelinesResponse,
+    GuidelineSearchResult, GuidelineSummary, ListCategoryParams, SearchGuidelinesParams,
+    UpdateGuidelinesResponse,
 };
 use mcp_common::vectordb::VectorDb;
 
-// --- MCP Server ---
-
-/// Shared application state, protected by RwLock for safe concurrent reads
-/// and exclusive writes during re-indexing.
 pub struct AppState {
     pub guidelines: HashMap<String, Guideline>,
     pub categories: HashMap<String, Category>,
 }
 
 #[derive(Clone)]
-pub struct CppGuidelinesServer {
+pub struct RustApiGuidelinesServer {
     state: Arc<RwLock<AppState>>,
     search_engine: Arc<SearchEngine>,
     update_service: Arc<UpdateService>,
     cache: Arc<GuidelineCache>,
-    tool_router: ToolRouter<CppGuidelinesServer>,
+    tool_router: ToolRouter<RustApiGuidelinesServer>,
 }
 
-impl CppGuidelinesServer {
+impl RustApiGuidelinesServer {
     pub fn new(
         guidelines: Vec<Guideline>,
         categories: HashMap<String, Category>,
@@ -92,8 +81,8 @@ impl CppGuidelinesServer {
 }
 
 #[tool_router]
-impl CppGuidelinesServer {
-    #[tool(description = "Search C++ Core Guidelines by semantic similarity. Returns ranked results matching the query.")]
+impl RustApiGuidelinesServer {
+    #[tool(description = "Search Rust API guidelines by semantic similarity.")]
     async fn search_guidelines(
         &self,
         Parameters(params): Parameters<SearchGuidelinesParams>,
@@ -128,7 +117,7 @@ impl CppGuidelinesServer {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    #[tool(description = "Get the full content of a specific C++ Core Guideline by ID (e.g. 'P.1', 'ES.20', 'SL.con.1').")]
+    #[tool(description = "Get a Rust API guideline by ID (e.g. 'C-CASE', 'C-DEBUG').")]
     async fn get_guideline(
         &self,
         Parameters(params): Parameters<GetGuidelineParams>,
@@ -138,14 +127,12 @@ impl CppGuidelinesServer {
             return Err(McpError::invalid_params("guideline_id must not be empty", None));
         }
 
-        // Check cache first
         if let Some(cached) = self.cache.get_guideline(&guideline_id).await {
             let json = serde_json::to_string_pretty(&to_api_guideline(&cached))
                 .map_err(|e| McpError::internal_error(format!("serialization failed: {e}"), None))?;
             return Ok(CallToolResult::success(vec![Content::text(json)]));
         }
 
-        // Look up in memory
         let state = self.state.read().await;
         let guideline = state
             .guidelines
@@ -160,13 +147,13 @@ impl CppGuidelinesServer {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    #[tool(description = "List all C++ Core Guidelines in a specific category. Use category prefixes like 'P' (Philosophy), 'R' (Resource management), 'ES' (Expressions), 'SL' (Standard Library), etc.")]
+    #[tool(description = "List all Rust API guidelines in a category (e.g. 'Naming', 'Documentation').")]
     async fn list_category(
         &self,
         Parameters(params): Parameters<ListCategoryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let category_prefix = params.category.trim().to_string();
-        if category_prefix.is_empty() {
+        let category_key = params.category.trim().to_string();
+        if category_key.is_empty() {
             return Err(McpError::invalid_params("category must not be empty", None));
         }
 
@@ -174,13 +161,14 @@ impl CppGuidelinesServer {
         let (category_key, category) = state
             .categories
             .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(&category_prefix))
+            .find(|(key, _)| key.eq_ignore_ascii_case(&category_key))
             .map(|(key, category)| (key.clone(), category.clone()))
             .ok_or_else(|| {
-                let available: Vec<&str> = state.categories.keys().map(|s| s.as_str()).collect();
+                let mut available: Vec<&str> = state.categories.keys().map(|s| s.as_str()).collect();
+                available.sort_unstable();
                 McpError::invalid_params(
                     format!(
-                        "unknown category: '{category_prefix}'. Available categories: {}",
+                        "unknown category: '{category_key}'. Available categories: {}",
                         available.join(", ")
                     ),
                     None,
@@ -200,9 +188,9 @@ impl CppGuidelinesServer {
 
         let response = CategoryListResponse {
             category: CategoryInfo {
-                key: category.prefix,
-                display_name: category.name,
-                guideline_count: category.rule_count,
+                key: category.key.clone(),
+                display_name: category.key,
+                guideline_count: category.guideline_count,
             },
             guidelines: guideline_summaries,
         };
@@ -213,7 +201,7 @@ impl CppGuidelinesServer {
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
 
-    #[tool(description = "Trigger a re-index of the C++ Core Guidelines from the git repository. Checks for updates and re-parses/re-embeds if the content has changed.")]
+    #[tool(description = "Trigger a re-index of Rust API guidelines from the git repository.")]
     async fn update_guidelines(&self) -> Result<CallToolResult, McpError> {
         info!("update_guidelines tool invoked");
 
@@ -223,7 +211,6 @@ impl CppGuidelinesServer {
             .await
             .map_err(|e| McpError::internal_error(format!("update failed: {e}"), None))?;
 
-        // If re-indexed, update the in-memory state
         if let Some((guidelines, categories)) = new_data {
             let guideline_count = guidelines.len();
             let guideline_map: HashMap<String, Guideline> = guidelines
@@ -262,41 +249,29 @@ fn to_api_guideline(guideline: &Guideline) -> GuidelineDetailResponse {
         title: guideline.title.clone(),
         category: guideline.category.clone(),
         raw_markdown: guideline.raw_markdown.clone(),
-        sections: Some(
-            guideline
-                .sections
-                .iter()
-                .map(|s| ApiGuidelineSection {
-                    heading: s.heading.clone(),
-                    content: s.content.clone(),
-                })
-                .collect(),
-        ),
-        source_file: None,
+        sections: None,
+        source_file: Some(guideline.source_file.clone()),
     }
 }
 
 #[tool_handler]
-impl ServerHandler for CppGuidelinesServer {
+impl ServerHandler for RustApiGuidelinesServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
-            capabilities: ServerCapabilities::builder()
-                .enable_tools()
-                .build(),
+            capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation {
-                name: "cpp-guidelines".to_string(),
+                name: "rust-api-guidelines".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
                 title: None,
                 icons: None,
                 website_url: None,
             },
             instructions: Some(
-                "C++ Core Guidelines MCP server. Provides semantic search and lookup \
-                 over the C++ Core Guidelines (~513 rules). Use search_guidelines for \
-                 natural language queries, get_guideline for specific rule lookup by ID, \
-                 list_category for browsing by category, and update_guidelines to \
-                 refresh from the repository."
+                "Rust API Guidelines MCP server. Provides semantic search and lookup over the \
+                 official Rust API Guidelines. Use search_guidelines for natural language queries, \
+                 get_guideline for specific IDs (for example C-CASE), list_category for chapter \
+                 browsing, and update_guidelines to refresh from the repository."
                     .to_string(),
             ),
         }
