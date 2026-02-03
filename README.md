@@ -41,6 +41,12 @@ mkdir -p data/lancedb data/redis
 docker compose up -d
 ```
 
+To start only Redis (without running all servers):
+
+```sh
+docker compose up -d redis
+```
+
 3. Clone the guideline repositories into the data directory:
 
 ```sh
@@ -78,8 +84,25 @@ cargo build
 - `cargo run -p rust-api-guidelines` -- run the Rust API Guidelines MCP server
 - `cargo run -p llm-proxy` -- run the local LLM proxy MCP server
 - `cargo run -p nodejs-guidelines` -- run the Node.js Best Practices MCP server
-- `docker compose up -d` -- start Redis
+- `docker compose up -d redis` -- start Redis only
 - `docker compose down` -- stop Redis
+
+## Docker Compose (All Services)
+
+To build and run Redis plus all MCP servers in containers:
+
+```sh
+docker compose up --build
+```
+
+The MCP servers listen over TCP inside Docker when `MCP_TCP_LISTEN_ADDR` is set:
+
+- `cpp-guidelines`: `localhost:7011`
+- `rust-api-guidelines`: `localhost:7012`
+- `nodejs-guidelines`: `localhost:7013`
+- `llm-proxy`: `localhost:7014`
+
+All services are attached to a shared Docker network named `mcp` so they can reach Redis at `redis:6379`.
 
 ## Rust API Guidelines MCP Tools
 

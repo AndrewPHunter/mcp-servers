@@ -10,6 +10,7 @@ mod update;
 use std::sync::Arc;
 
 use rmcp::{ServiceExt, transport::stdio};
+use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -83,12 +84,29 @@ async fn main() -> anyhow::Result<()> {
 
     let server = RustApiGuidelinesServer::new(guidelines, categories, embedder, vectordb, cache, config);
 
-    info!("MCP server ready, serving on stdio");
-    let service = server.serve(stdio()).await.inspect_err(|e| {
-        tracing::error!(error = %e, "MCP server error");
-    })?;
-
-    service.waiting().await?;
-    info!("MCP server shut down");
+    if let Ok(addr) = std::env::var("MCP_TCP_LISTEN_ADDR") {
+        let listener = TcpListener::bind(&addr).await?;
+        info!(listen_addr = %addr, "MCP server ready, serving on TCP");
+        loop {
+            let (stream, peer) = listener.accept().await?;
+            let server = server.clone();
+            tokio::spawn(async move {
+                tracing::info!(peer = %peer, "MCP client connected");
+                let service = server.serve(stream).await.inspect_err(|e| {
+                    tracing::error!(error = %e, "MCP server error");
+                })?;
+                service.waiting().await?;
+                tracing::info!(peer = %peer, "MCP client disconnected");
+                Ok::<(), anyhow::Error>(())
+            });
+        }
+    } else {
+        info!("MCP server ready, serving on stdio");
+        let service = server.serve(stdio()).await.inspect_err(|e| {
+            tracing::error!(error = %e, "MCP server error");
+        })?;
+        service.waiting().await?;
+        info!("MCP server shut down");
+    }
     Ok(())
 }

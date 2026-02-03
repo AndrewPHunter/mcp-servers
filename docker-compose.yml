@@ -6,3 +6,111 @@ services:
     volumes:
       - ./data/redis:/data
     command: redis-server --appendonly yes
+    networks:
+      - mcp
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cpp-guidelines:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: cpp-guidelines
+        BIN: cpp-guidelines
+    environment:
+      REDIS_URL: redis://redis:6379
+      LANCEDB_PATH: /app/data/lancedb
+      CPP_GUIDELINES_REPO_PATH: /app/data/cpp-guidelines
+      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7011
+    volumes:
+      - ./data:/app/data
+      - mcp-model-cache:/root/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "7011:7011"
+    networks:
+      - mcp
+    restart: unless-stopped
+
+  rust-api-guidelines:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: rust-api-guidelines
+        BIN: rust-api-guidelines
+    environment:
+      REDIS_URL: redis://redis:6379
+      LANCEDB_PATH: /app/data/lancedb
+      RUST_API_GUIDELINES_REPO_PATH: /app/data/rust-api-guidelines
+      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7012
+    volumes:
+      - ./data:/app/data
+      - mcp-model-cache:/root/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "7012:7012"
+    networks:
+      - mcp
+    restart: unless-stopped
+
+  nodejs-guidelines:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: nodejs-guidelines
+        BIN: nodejs-guidelines
+    environment:
+      REDIS_URL: redis://redis:6379
+      LANCEDB_PATH: /app/data/lancedb
+      NODEJS_GUIDELINES_REPO_PATH: /app/data/nodejs-guidelines
+      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7013
+    volumes:
+      - ./data:/app/data
+      - mcp-model-cache:/root/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "7013:7013"
+    networks:
+      - mcp
+    restart: unless-stopped
+
+  llm-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: llm-proxy
+        BIN: llm-proxy
+    environment:
+      REDIS_URL: redis://redis:6379
+      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7014
+      # If you run an OpenAI-compatible local model host in the same docker network under the
+      # service name "ai", this default works out of the box.
+      OPENAI_BASE_URL: http://ai:8001/v1
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "7014:7014"
+    networks:
+      - mcp
+    restart: unless-stopped
+
+networks:
+  mcp:
+    name: mcp
+
+volumes:
+  mcp-model-cache:
