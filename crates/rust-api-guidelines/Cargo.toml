@@ -22,5 +22,6 @@ tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
-rmcp = { version = "0.14", features = ["server", "transport-io", "transport-async-rw"] }
+rmcp = { version = "0.14", features = ["server", "transport-io", "transport-streamable-http-server"] }
+axum = { workspace = true }
 schemars = "0.8"

@@ -24,7 +24,7 @@ services:
       REDIS_URL: redis://redis:6379
       LANCEDB_PATH: /app/data/lancedb
       CPP_GUIDELINES_REPO_PATH: /app/data/cpp-guidelines
-      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7011
+      MCP_LISTEN_ADDR: 0.0.0.0:7011
     volumes:
       - ./data:/app/data
       - mcp-model-cache:/root/.cache
@@ -47,7 +47,7 @@ services:
       REDIS_URL: redis://redis:6379
       LANCEDB_PATH: /app/data/lancedb
       RUST_API_GUIDELINES_REPO_PATH: /app/data/rust-api-guidelines
-      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7012
+      MCP_LISTEN_ADDR: 0.0.0.0:7012
     volumes:
       - ./data:/app/data
       - mcp-model-cache:/root/.cache
@@ -70,7 +70,7 @@ services:
       REDIS_URL: redis://redis:6379
       LANCEDB_PATH: /app/data/lancedb
       NODEJS_GUIDELINES_REPO_PATH: /app/data/nodejs-guidelines
-      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7013
+      MCP_LISTEN_ADDR: 0.0.0.0:7013
     volumes:
       - ./data:/app/data
       - mcp-model-cache:/root/.cache
@@ -93,7 +93,7 @@ services:
       - "ai:${AI_HOST_IP}"
     environment:
       REDIS_URL: redis://redis:6379
-      MCP_TCP_LISTEN_ADDR: 0.0.0.0:7014
+      MCP_LISTEN_ADDR: 0.0.0.0:7014
       # If you run an OpenAI-compatible local model host in the same docker network under the
       # service name "ai", this default works out of the box.
       OPENAI_BASE_URL: http://ai:8001/v1

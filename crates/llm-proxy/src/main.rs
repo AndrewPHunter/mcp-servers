@@ -4,6 +4,9 @@ mod server;
 use std::sync::Arc;
 
 use rmcp::{ServiceExt, transport::stdio};
+use rmcp::transport::streamable_http_server::{
+    StreamableHttpService, session::local::LocalSessionManager,
+};
 use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -50,22 +53,17 @@ async fn main() -> anyhow::Result<()> {
 
     let server = LlmProxyServer::new(openai, convos, usage, limiter);
 
-    if let Ok(addr) = std::env::var("MCP_TCP_LISTEN_ADDR") {
+    if let Ok(addr) = std::env::var("MCP_LISTEN_ADDR") {
+        let server_for_factory = server.clone();
+        let http_service = StreamableHttpService::new(
+            move || Ok(server_for_factory.clone()),
+            LocalSessionManager::default().into(),
+            Default::default(),
+        );
+        let router = axum::Router::new().fallback_service(http_service);
         let listener = TcpListener::bind(&addr).await?;
-        info!(listen_addr = %addr, "MCP server ready, serving on TCP");
-        loop {
-            let (stream, peer) = listener.accept().await?;
-            let server = server.clone();
-            tokio::spawn(async move {
-                tracing::info!(peer = %peer, "MCP client connected");
-                let service = server.serve(stream).await.inspect_err(|e| {
-                    tracing::error!(error = %e, "MCP server error");
-                })?;
-                service.waiting().await?;
-                tracing::info!(peer = %peer, "MCP client disconnected");
-                Ok::<(), anyhow::Error>(())
-            });
-        }
+        info!(listen_addr = %addr, "MCP server ready, serving HTTP/SSE");
+        axum::serve(listener, router).await?;
     } else {
         info!("MCP server ready, serving on stdio");
         let service = server.serve(stdio()).await.inspect_err(|e| {

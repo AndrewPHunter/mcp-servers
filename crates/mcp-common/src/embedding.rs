@@ -42,13 +42,15 @@ impl Embedder {
     ///
     /// The nomic-embed-text model expects document inputs prefixed with "search_document: ".
     /// This method adds the prefix automatically.
+    ///
+    /// Documents are processed in small batches to bound peak memory during ONNX inference.
     pub async fn embed_documents(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, CommonError> {
         let prefixed: Vec<String> = texts
             .iter()
             .map(|t| format!("search_document: {t}"))
             .collect();
         let model = Arc::clone(&self.model);
-        tokio::task::spawn_blocking(move || model.embed(prefixed, None))
+        tokio::task::spawn_blocking(move || model.embed(prefixed, Some(4)))
             .await
             .map_err(|e| CommonError::Embedding(format!("spawn_blocking join error: {e}")))?
             .map_err(|e| CommonError::Embedding(format!("document embedding failed: {e}")))
