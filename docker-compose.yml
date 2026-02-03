@@ -19,7 +19,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        PACKAGE: cpp-guidelines
         BIN: cpp-guidelines
     environment:
       REDIS_URL: redis://redis:6379
@@ -43,7 +42,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        PACKAGE: rust-api-guidelines
         BIN: rust-api-guidelines
     environment:
       REDIS_URL: redis://redis:6379
@@ -67,7 +65,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        PACKAGE: nodejs-guidelines
         BIN: nodejs-guidelines
     environment:
       REDIS_URL: redis://redis:6379
@@ -91,8 +88,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        PACKAGE: llm-proxy
         BIN: llm-proxy
+    extra_hosts:
+      - "ai:${AI_HOST_IP}"
     environment:
       REDIS_URL: redis://redis:6379
       MCP_TCP_LISTEN_ADDR: 0.0.0.0:7014
